@@ -24,6 +24,14 @@ locals {
   # repeat a key here: two files setting it only work out by filename sort order.
   sysctls = var.extra_sysctls
 
+  # Records boot 1's cloud-init result where boot 2 can still read it. After power_state reboots,
+  # `cloud-init status` only describes the current boot: it says "done", rc 0, no errors, even
+  # when package_upgrade or a runcmd failed on the first boot. GlueKube's
+  # playbooks/wait-for-cloud-init.yaml reads this marker instead, and recognises a node built from
+  # this module by the marker path appearing in its cloud-config. Keep the path in step with it.
+  first_boot_marker        = "/var/lib/cloud/instance/first-boot.json"
+  first_boot_marker_script = "/usr/local/sbin/gluekube-first-boot-marker"
+
   write_files = concat(
     length(local.sysctls) > 0 ? [{
       path    = "/etc/sysctl.d/k8s.conf"
@@ -39,6 +47,24 @@ locals {
         "APT::Periodic::AutocleanInterval \"0\";\n",
         "APT::Periodic::Unattended-Upgrade \"0\";\n",
       ])
+    }],
+    [{
+      # Run as power_state's condition, after cloud-init has exited (or after power_state's
+      # timeout if it has not). Writes {"boot_id": ..., "cloud_init": <status --format json>}
+      # atomically and always exits 0, so the reboot happens either way: the result is judged
+      # by GlueKube on boot 2, not here.
+      path        = local.first_boot_marker_script
+      permissions = "0755"
+      content     = <<-EOT
+        #!/bin/sh
+        out=${local.first_boot_marker}
+        tmp="$out.tmp.$$"
+        status=$(cloud-init status --format json 2>/dev/null)
+        [ -n "$status" ] || status=null
+        printf '{"boot_id": "%s", "cloud_init": %s}\n' \
+          "$(cat /proc/sys/kernel/random/boot_id)" "$status" > "$tmp" && mv -f "$tmp" "$out"
+        exit 0
+      EOT
     }],
   )
 
@@ -83,11 +109,14 @@ locals {
       # and libraries. power_state is per-instance (first boot only) and waits for cloud-init,
       # runcmd included, to complete. Deliberately not package_reboot_if_required, which reboots
       # mid-run and only when a package asks for it.
+      #
+      # condition reboots regardless of how cloud-init went (the script always exits 0); on the
+      # way it saves boot 1's result to the first-boot marker -- see local.first_boot_marker.
       power_state = {
         mode      = "reboot"
         message   = "cloud-init finished, rebooting after package upgrade"
         timeout   = 30
-        condition = true
+        condition = local.first_boot_marker_script
       }
     },
     # Omitted rather than rendered as `runcmd: []` when there is nothing to run.

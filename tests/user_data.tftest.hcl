@@ -25,6 +25,21 @@ run "defaults" {
   }
 
   assert {
+    condition     = yamldecode(output.user_data).power_state.condition == "/usr/local/sbin/gluekube-first-boot-marker"
+    error_message = "power_state.condition must run the first-boot marker script."
+  }
+
+  # GlueKube's wait-for-cloud-init.yaml recognises new nodes by this path in the cloud-config,
+  # and reads boot 1's result from it after the reboot.
+  assert {
+    condition = anytrue([
+      for f in yamldecode(output.user_data).write_files :
+      f.path == "/usr/local/sbin/gluekube-first-boot-marker" && f.permissions == "0755" && strcontains(f.content, "/var/lib/cloud/instance/first-boot.json")
+    ])
+    error_message = "The first-boot marker script must be written, executable, and write /var/lib/cloud/instance/first-boot.json."
+  }
+
+  assert {
     condition     = !can(yamldecode(output.user_data).package_reboot_if_required)
     error_message = "package_reboot_if_required must not be set alongside power_state."
   }

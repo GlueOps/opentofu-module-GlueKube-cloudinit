@@ -22,9 +22,16 @@ The Kubernetes sysctls (bridge-nf-call, `ip_forward` and node tuning) are not se
 `ansible/roles/common/tasks/prepare-node.yaml` owns them, so they also reach existing nodes. Don't
 pass those keys in `extra_sysctls`.
 
-GlueKube's `ansible/playbooks/wait-for-cloud-init.yaml` waits for the reboot by finding
-`power_state` in the node's cloud-config, and fails the run if cloud-init did not succeed. Keep
-`power_state` here, or that wait stops recognising new nodes.
+After a reboot, `cloud-init status` only covers the current boot, so it reports `done` even if
+the first boot failed. To keep that result, `power_state.condition` runs
+`/usr/local/sbin/gluekube-first-boot-marker` just before the reboot. The script writes
+`/var/lib/cloud/instance/first-boot.json` = `{"boot_id": ..., "cloud_init": <cloud-init status --format json>}`
+and always exits 0, so the node always reboots.
+
+GlueKube's `ansible/playbooks/wait-for-cloud-init.yaml` spots nodes built from this module by that
+marker path in their cloud-config. It waits until the node is on a new boot and fails the run if
+the marker records first-boot errors. Keep `power_state` and the marker path here as they are, or
+that wait stops recognising new nodes.
 
 Platform differences are passed in with the `extra_*` inputs. Keys this module manages cannot be
 overridden through `extra_cloud_config`.
