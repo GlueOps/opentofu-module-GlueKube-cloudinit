@@ -39,6 +39,25 @@ run "defaults" {
     error_message = "The first-boot marker script must be written, executable, and write /var/lib/cloud/instance/first-boot.json."
   }
 
+  # Same mirror as GlueKube's roles/apt_sources, so first boot's update/upgrade goes through it.
+  assert {
+    condition     = yamldecode(output.user_data).apt.preserve_sources_list == false
+    error_message = "cloud-init must write the apt sources, not keep the image's."
+  }
+
+  assert {
+    condition = alltrue([
+      for suffix in ["", "-updates", "-security"] :
+      strcontains(yamldecode(output.user_data).apt.sources_list, "URIs: https://repo.gpkg.io/repository/ubuntu-$RELEASE${suffix}\nSuites: $RELEASE${suffix}\n")
+    ])
+    error_message = "apt.sources_list must point every Ubuntu suite at the mirror."
+  }
+
+  assert {
+    condition     = !strcontains(yamldecode(output.user_data).apt.sources_list, "deb ")
+    error_message = "apt.sources_list must be deb822, so cloud-init writes ubuntu.sources and stubs sources.list."
+  }
+
   assert {
     condition     = !can(yamldecode(output.user_data).package_reboot_if_required)
     error_message = "package_reboot_if_required must not be set alongside power_state."
@@ -113,6 +132,16 @@ run "managed_keys_are_protected" {
 
   variables {
     extra_cloud_config = { power_state = { mode = "poweroff" } }
+  }
+
+  expect_failures = [var.extra_cloud_config]
+}
+
+run "apt_mirror_is_protected" {
+  command = plan
+
+  variables {
+    extra_cloud_config = { apt = { preserve_sources_list = true } }
   }
 
   expect_failures = [var.extra_cloud_config]

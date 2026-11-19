@@ -18,6 +18,25 @@ locals {
     "unattended-upgrades.service",
   ]
 
+  # The Ubuntu suites through the same mirror GlueKube's Ansible uses after prepare-node
+  # (roles/apt_sources/templates/ubuntu.sources.j2) -- keep the two in step. The mirror serves
+  # each suite as its own repository, ubuntu-<codename>[-updates|-security], so this can't be
+  # expressed with apt.primary/apt.security; it's a full sources_list instead. cloud-init fills in
+  # $RELEASE with the image's codename. Being deb822, cloud-init writes it to
+  # /etc/apt/sources.list.d/ubuntu.sources and replaces sources.list with its stub, on jammy as
+  # well as noble. apt_configure runs in the config stage, before package_update/upgrade.
+  apt_mirror = "https://repo.gpkg.io/repository"
+  apt_sources = join("\n", [
+    for suffix in ["", "-updates", "-security"] : join("\n", [
+      "Types: deb",
+      "URIs: ${local.apt_mirror}/ubuntu-$RELEASE${suffix}",
+      "Suites: $RELEASE${suffix}",
+      "Components: main restricted universe multiverse",
+      "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg",
+      "",
+    ])
+  ])
+
   # Only platform-specific keys (e.g. rp_filter for a named interface). The Kubernetes sysctls --
   # bridge-nf-call, ip_forward and the node tuning -- belong to GlueKube's prepare-node.yaml, which
   # writes /etc/sysctl.d/99-kubernetes.conf and also reaches nodes that already exist. Do not
@@ -88,6 +107,11 @@ locals {
         "systemctl mask ${join(" ", local.apt_units)}",
         "systemctl stop --no-block ${join(" ", local.apt_units)}",
       ]
+
+      apt = {
+        preserve_sources_list = false
+        sources_list          = local.apt_sources
+      }
 
       package_update  = true
       package_upgrade = true

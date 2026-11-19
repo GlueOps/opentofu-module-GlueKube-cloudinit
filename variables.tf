@@ -50,16 +50,16 @@ variable "extra_cloud_config" {
   description = <<-EOT
     Additional top-level cloud-config keys merged into the document, for anything the inputs above
     do not cover (e.g. `mounts`). Keys this module manages cannot be set here -- use the matching
-    extra_* input instead -- so a caller cannot silently drop the update policy or the reboot.
+    extra_* input instead -- so a caller cannot silently drop the update policy, the apt mirror or the reboot.
   EOT
   type        = any
   default     = {}
 
   validation {
     condition = length(setintersection(keys(var.extra_cloud_config), [
-      "bootcmd", "hostname", "package_update", "package_upgrade", "packages", "power_state",
+      "apt", "bootcmd", "hostname", "package_update", "package_upgrade", "packages", "power_state",
       "runcmd", "ssh_pwauth", "users", "write_files",
     ])) == 0
-    error_message = "extra_cloud_config must not set a key this module manages (bootcmd, hostname, package_update, package_upgrade, packages, power_state, runcmd, ssh_pwauth, users, write_files). Use extra_packages, extra_write_files or extra_runcmd instead."
+    error_message = "extra_cloud_config must not set a key this module manages (apt, bootcmd, hostname, package_update, package_upgrade, packages, power_state, runcmd, ssh_pwauth, users, write_files). Use extra_packages, extra_write_files or extra_runcmd instead."
   }
 }
