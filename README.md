@@ -188,7 +188,7 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_extra_cloud_config"></a> [extra\_cloud\_config](#input\_extra\_cloud\_config) | Additional top-level cloud-config keys merged into the document, for anything the inputs above<br/>do not cover (e.g. `mounts`). Keys this module manages cannot be set here -- use the matching<br/>extra\_* input instead -- so a caller cannot silently drop the update policy or the reboot. | `any` | `{}` | no |
+| <a name="input_extra_cloud_config"></a> [extra\_cloud\_config](#input\_extra\_cloud\_config) | Additional top-level cloud-config keys merged into the document, for anything the inputs above<br/>do not cover (e.g. `mounts`). Keys this module manages cannot be set here -- use the matching<br/>extra\_* input instead -- so a caller cannot silently drop the update policy, the apt mirror or the reboot. | `any` | `{}` | no |
 | <a name="input_extra_packages"></a> [extra\_packages](#input\_extra\_packages) | Packages installed in addition to the base set (curl). | `list(string)` | `[]` | no |
 | <a name="input_extra_runcmd"></a> [extra\_runcmd](#input\_extra\_runcmd) | Commands appended to runcmd, after the base ones. They run as root in the final stage, before the power\_state reboot. | `list(string)` | `[]` | no |
 | <a name="input_extra_sysctls"></a> [extra\_sysctls](#input\_extra\_sysctls) | Platform-specific sysctls (key => value) written to /etc/sysctl.d/k8s.conf, e.g. rp\_filter for a named interface. Nothing is written when empty. Kubernetes sysctls (bridge-nf-call, ip\_forward, node tuning) are set by GlueKube's Ansible, not here. | `map(string)` | `{}` | no |
