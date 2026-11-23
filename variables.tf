@@ -41,7 +41,7 @@ variable "extra_write_files" {
 }
 
 variable "extra_runcmd" {
-  description = "Commands appended to runcmd, after the base ones. They run as root in the final stage, before the power_state reboot."
+  description = "Commands appended to runcmd, after the base ones. They run as root in the final stage, before the power_state reboot, under `set -e`: a failing command stops the remaining ones and fails the first boot, so append `|| true` to a command whose failure is acceptable."
   type        = list(string)
   default     = []
 }

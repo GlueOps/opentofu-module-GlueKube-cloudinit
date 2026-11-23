@@ -92,10 +92,14 @@ locals {
     for f in var.extra_write_files : { for k, v in f : k => v if v != null }
   ]
 
-  runcmd = concat(
+  base_runcmd = concat(
     length(local.sysctls) > 0 ? ["sysctl --system"] : [],
     var.extra_runcmd,
   )
+
+  # cloud-init runs runcmd as one /bin/sh script and reports only its exit code. Without -e, a
+  # failure before the last command would leave a clean first-boot marker.
+  runcmd = length(local.base_runcmd) > 0 ? concat(["set -e"], local.base_runcmd) : []
 
   cloud_config = merge(
     {

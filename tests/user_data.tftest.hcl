@@ -117,13 +117,28 @@ run "platform_extras" {
   }
 
   assert {
-    condition     = yamldecode(output.user_data).runcmd == ["sysctl --system", "passwd -d root"]
-    error_message = "extra_runcmd runs after the base commands."
+    condition     = yamldecode(output.user_data).runcmd == ["set -e", "sysctl --system", "passwd -d root"]
+    error_message = "runcmd must start with set -e, and extra_runcmd runs after the base commands."
   }
 
   assert {
     condition     = yamldecode(output.user_data).mounts[0][0] == "swap"
     error_message = "extra_cloud_config keys are merged in."
+  }
+}
+
+# cloud-init reports only the runcmd script's exit code, so without set -e GlueKube would judge a
+# node ready after any failure before the last command.
+run "runcmd_fails_fast" {
+  command = plan
+
+  variables {
+    extra_runcmd = ["netplan apply"]
+  }
+
+  assert {
+    condition     = yamldecode(output.user_data).runcmd[0] == "set -e"
+    error_message = "set -e must be the first runcmd entry."
   }
 }
 
